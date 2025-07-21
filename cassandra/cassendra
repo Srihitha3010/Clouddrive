@@ -1,0 +1,50 @@
+package cassandra
+
+import (
+	"log"
+
+	"github.com/gocql/gocql"
+)
+
+var Session *gocql.Session
+
+// Initialize Cassandra connection
+func InitCassandra() {
+	cluster := gocql.NewCluster("127.0.0.1") // change if needed
+	cluster.Keyspace = "clouddrive"
+	cluster.Consistency = gocql.Quorum
+
+	session, err := cluster.CreateSession()
+	if err != nil {
+		log.Fatalf("Cassandra connection error: %v", err)
+	}
+
+	Session = session
+	log.Println("✅ Connected to Cassandra")
+}
+
+// Insert file metadata into Cassandra
+func InsertMetadata(fileID gocql.UUID, chunkIDs []string, fileName string) error {
+	return Session.Query(`
+		INSERT INTO files (file_id, chunk_ids, file_name) VALUES (?, ?, ?)`,
+		fileID, chunkIDs, fileName).Exec()
+}
+
+
+func GetMetadata(fileID gocql.UUID) ([]string, string, error) {
+    var chunkIDs []string
+    var fileName string
+
+    err := Session.Query(`SELECT chunk_ids, file_name FROM files WHERE file_id = ?`, fileID).
+        Scan(&chunkIDs, &fileName)
+    return chunkIDs, fileName, err
+}
+
+
+
+// Delete file metadata from Cassandra
+func DeleteMetadata(fileID gocql.UUID) error {
+	return Session.Query(`
+		DELETE FROM files WHERE file_id = ?`,
+		fileID).Exec()
+}
